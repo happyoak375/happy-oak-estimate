@@ -1,3 +1,17 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import "tailwindcss";
+
+@theme {
+  /* Happy Oak Brand Colors */
+  --color-brand-brown: #51321f;
+  --color-brand-blue: #1d65a6;
+  --color-brand-canvas: #f9f9f9;
+  --color-brand-amber: #c37530;
+  --color-brand-green: #38761d;
+  --color-brand-yellow: #fcda24;
+}
+
+/* Add some basic body styling */
+body {
+  background-color: var(--color-brand-canvas);
+  color: var(--color-brand-brown);
+}
