@@ -9,6 +9,8 @@ export interface JobArea {
 export interface EstimateData {
   estimateName: string;
   clientName: string;
+  clientEmail: string;
+  status?: string;
   street: string;
   cityStateZip: string;
   jobAreas: JobArea[];

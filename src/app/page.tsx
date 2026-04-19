@@ -5,13 +5,29 @@ import Link from "next/link";
 import Header from "@/components/layout/Header";
 import { DatabaseService } from "@/lib/dbService";
 import { PDFService } from "@/lib/pdfService";
+import { useRouter } from "next/navigation";
+import { useAuth } from "@/context/AuthContext";
 
 export default function Dashboard() {
+  // 1. ALL HOOKS GO AT THE VERY TOP
   const [proposals, setProposals] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const { user, loading: authLoading } = useAuth();
+  const router = useRouter();
 
+  // 2. Security Bouncer: Redirect if not logged in
+  useEffect(() => {
+    if (!authLoading && !user) {
+      router.push("/login");
+    }
+  }, [user, authLoading, router]);
+
+  // 3. Data Loading Effect
   useEffect(() => {
     async function loadData() {
+      // Don't try to load data if the user isn't logged in yet
+      if (!user) return; 
+
       try {
         const data = await DatabaseService.getProposals();
         setProposals(data);
@@ -22,24 +38,7 @@ export default function Dashboard() {
       }
     }
     loadData();
-  }, []);
-
-  // --- NEW: Handle the safe deletion process ---
-  const handleDelete = async (id: string, estimateName: string) => {
-    // The browser's native confirmation pop-up
-    const isConfirmed = window.confirm(`Are you sure you want to permanently delete "${estimateName}"? This cannot be undone.`);
-    
-    if (isConfirmed) {
-      try {
-        await DatabaseService.deleteProposal(id);
-        // Instantly remove it from the screen without making the user refresh the page
-        setProposals(prevProposals => prevProposals.filter(prop => prop.id !== id));
-      } catch (error) {
-        console.error("Failed to delete:", error);
-        alert("An error occurred while trying to delete the estimate.");
-      }
-    }
-  };
+  }, [user]);
 
   // --- NEW MATH: Calculate Approved vs Sent ---
   const approvedTotal = proposals
@@ -56,6 +55,21 @@ export default function Dashboard() {
       return total + propTotal;
     }, 0);
 
+  // --- Handle the safe deletion process ---
+  const handleDelete = async (id: string, estimateName: string) => {
+    const isConfirmed = window.confirm(`Are you sure you want to permanently delete "${estimateName}"? This cannot be undone.`);
+    
+    if (isConfirmed) {
+      try {
+        await DatabaseService.deleteProposal(id);
+        setProposals(prevProposals => prevProposals.filter(prop => prop.id !== id));
+      } catch (error) {
+        console.error("Failed to delete:", error);
+        alert("An error occurred while trying to delete the estimate.");
+      }
+    }
+  };
+
   // Helper to color-code the status badges
   const getStatusBadge = (status: string) => {
     switch (status) {
@@ -70,6 +84,12 @@ export default function Dashboard() {
         return "bg-brand-yellow text-brand-brown bg-opacity-30"; 
     }
   };
+
+  // 4. NOW WE CAN SAFELY DO EARLY RETURNS
+  // While the bouncer is checking IDs, show a blank or loading screen
+  if (authLoading || !user) {
+    return <div className="min-h-screen bg-brand-canvas flex items-center justify-center text-brand-blue font-bold text-xl">Securing connection...</div>;
+  }
 
   return (
     <div className="min-h-screen bg-brand-canvas">
@@ -169,7 +189,6 @@ export default function Dashboard() {
                               Edit
                             </Link>
                             <span className="text-gray-300">|</span>
-                            {/* --- THE NEW DELETE BUTTON --- */}
                             <button 
                               onClick={() => handleDelete(prop.id, prop.clientName || "this estimate")}
                               className="text-red-400 hover:text-red-600 font-bold text-sm transition-colors"

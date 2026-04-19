@@ -1,5 +1,6 @@
 import { initializeApp, getApps, getApp } from "firebase/app";
 import { getFirestore } from "firebase/firestore";
+import { getAuth } from "firebase/auth";
 
 const firebaseConfig = {
   apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
@@ -13,5 +14,10 @@ const firebaseConfig = {
 // Initialize Firebase (This checks if it's already running to prevent errors)
 const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
 
-// Export the database so we can use it in our app
-export const db = getFirestore(app);
+// Initialize Database and Auth
+const db = getFirestore(app);
+// FIXED: Changed 'auth3' to 'auth'
+const auth = getAuth(app);
+
+// Export everything cleanly at the bottom
+export { app, db, auth };

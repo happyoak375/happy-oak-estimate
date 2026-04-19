@@ -11,6 +11,7 @@ export default function EstimateForm({ estimateId }: { estimateId?: string }) {
   const [formData, setFormData] = useState<EstimateData>({
     estimateName: "",
     clientName: "",
+    clientEmail: "", // Required for Resend
     street: "",
     cityStateZip: "",
     showLineItemPrices: true,
@@ -19,17 +20,17 @@ export default function EstimateForm({ estimateId }: { estimateId?: string }) {
   });
 
   const [isSaving, setIsSaving] = useState(false);
-  const [isLoading, setIsLoading] = useState(!!estimateId); 
+  const [isSending, setIsSending] = useState(false);
+  const [isLoading, setIsLoading] = useState(!!estimateId);
   const [statusMessage, setStatusMessage] = useState<{ text: string; type: "error" | "success" | "info" } | null>(null);
 
-  // NEW: Fetch data if we are in Edit Mode
+  // Fetch data if we are in Edit Mode
   useEffect(() => {
     async function loadEstimate() {
       if (!estimateId) return;
       try {
         const data = await DatabaseService.getProposalById(estimateId);
         if (data) {
-          // Ensure jobAreas exist, otherwise provide a blank one
           const loadedData = data as EstimateData;
           if (!loadedData.jobAreas || loadedData.jobAreas.length === 0) {
             loadedData.jobAreas = [{ id: generateId(), areaName: "", tasks: "", exceptions: "", price: "" }];
@@ -49,7 +50,7 @@ export default function EstimateForm({ estimateId }: { estimateId?: string }) {
     loadEstimate();
   }, [estimateId]);
 
-  const handleTopLevelChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleTopLevelChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
     setFormData((prev) => ({ ...prev, [name]: value }));
   };
@@ -57,7 +58,7 @@ export default function EstimateForm({ estimateId }: { estimateId?: string }) {
   const handleJobAreaChange = (id: string, field: keyof JobArea, value: string) => {
     setFormData((prev) => ({
       ...prev,
-      jobAreas: prev.jobAreas.map((area) => 
+      jobAreas: prev.jobAreas.map((area) =>
         area.id === id ? { ...area, [field]: value } : area
       )
     }));
@@ -82,7 +83,7 @@ export default function EstimateForm({ estimateId }: { estimateId?: string }) {
     return total + areaPrice;
   }, 0);
 
-  // UPDATED: Save OR Update depending on mode
+  // Save OR Update depending on mode
   const handleSaveToCloud = async () => {
     if (!formData.clientName) {
       setStatusMessage({ text: "Client Name is required.", type: "error" });
@@ -96,7 +97,7 @@ export default function EstimateForm({ estimateId }: { estimateId?: string }) {
         await DatabaseService.updateProposal(estimateId, formData);
         setStatusMessage({ text: "Success! Estimate updated.", type: "success" });
       } else {
-        const documentId = await DatabaseService.saveProposal(formData);
+        await DatabaseService.saveProposal(formData);
         setStatusMessage({ text: `Success! Saved securely.`, type: "success" });
       }
     } catch (error) {
@@ -104,6 +105,41 @@ export default function EstimateForm({ estimateId }: { estimateId?: string }) {
       setStatusMessage({ text: "Failed to save to database.", type: "error" });
     } finally {
       setIsSaving(false);
+    }
+  };
+
+  // Generate PDF and Send via Resend
+  const handleSendEmail = async () => {
+    if (!formData.clientEmail) {
+      setStatusMessage({ text: "Client Email is required to send the proposal.", type: "error" });
+      return;
+    }
+    setIsSending(true);
+    setStatusMessage({ text: "Generating PDF and sending email...", type: "info" });
+
+    try {
+      const pdfBase64 = await PDFService.generateEstimatePDFBase64(formData);
+
+      const response = await fetch('/api/send-proposal', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: formData.clientEmail,
+          clientName: formData.clientName,
+          estimateName: formData.estimateName || "Project Estimate",
+          pdfBase64: pdfBase64,
+        }),
+      });
+
+      if (!response.ok) throw new Error("Failed to send");
+
+      setFormData(prev => ({ ...prev, status: "Sent" }));
+      setStatusMessage({ text: "Success! Email sent to client.", type: "success" });
+    } catch (error) {
+      console.error(error);
+      setStatusMessage({ text: "Failed to send email. Check console.", type: "error" });
+    } finally {
+      setIsSending(false);
     }
   };
 
@@ -115,23 +151,27 @@ export default function EstimateForm({ estimateId }: { estimateId?: string }) {
     <div className="max-w-5xl mx-auto space-y-6 pb-20">
       <section className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 border-t-4 border-t-brand-brown">
         <h2 className="text-lg font-semibold text-brand-brown mb-4">Project Details</h2>
-        
-        {/* Changed grid to have 3 columns on desktop to fit the new dropdown elegantly */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
           <div className="space-y-1">
             <label className="text-sm font-medium text-gray-700">Estimate Name</label>
-            <input type="text" name="estimateName" value={formData.estimateName} onChange={handleTopLevelChange} placeholder="e.g. Interior & Exterior Paint" className="w-full p-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-brand-blue outline-none" />
+            <input type="text" name="estimateName" value={formData.estimateName} onChange={handleTopLevelChange} placeholder="e.g. Interior Paint" className="w-full p-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-brand-blue outline-none" />
           </div>
           <div className="space-y-1">
             <label className="text-sm font-medium text-gray-700">Client Name</label>
             <input type="text" name="clientName" value={formData.clientName} onChange={handleTopLevelChange} placeholder="John Doe" className="w-full p-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-brand-blue outline-none" />
           </div>
+          {/* --- THE MISSING EMAIL FIELD --- */}
+          <div className="space-y-1">
+            <label className="text-sm font-medium text-gray-700">Client Email</label>
+            <input type="email" name="clientEmail" value={formData.clientEmail || ""} onChange={handleTopLevelChange} placeholder="client@email.com" className="w-full p-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-brand-blue outline-none" />
+          </div>
           <div className="space-y-1">
             <label className="text-sm font-medium text-gray-700">Proposal Status</label>
-            <select 
-              name="status" 
-              value={formData.status || "Draft"} 
-              onChange={handleTopLevelChange as any} 
+            <select
+              name="status"
+              value={formData.status || "Draft"}
+              onChange={handleTopLevelChange}
               className="w-full p-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-brand-blue outline-none bg-white font-semibold text-brand-brown"
             >
               <option value="Draft">Draft</option>
@@ -144,9 +184,9 @@ export default function EstimateForm({ estimateId }: { estimateId?: string }) {
             <label className="text-sm font-medium text-gray-700">Street Address</label>
             <input type="text" name="street" value={formData.street} onChange={handleTopLevelChange} placeholder="123 Main St" className="w-full p-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-brand-blue outline-none" />
           </div>
-          <div className="space-y-1">
+          <div className="space-y-1 lg:col-span-2">
             <label className="text-sm font-medium text-gray-700">City, State, ZIP</label>
-            <input type="text" name="cityStateZip" value={formData.cityStateZip} onChange={handleTopLevelChange} placeholder="Medellín, ANT 050021" className="w-full p-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-brand-blue outline-none" />
+            <input type="text" name="cityStateZip" value={formData.cityStateZip} onChange={handleTopLevelChange} placeholder="Bernardsville, NJ 07924" className="w-full p-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-brand-blue outline-none" />
           </div>
         </div>
       </section>
@@ -163,13 +203,13 @@ export default function EstimateForm({ estimateId }: { estimateId?: string }) {
               </button>
             )}
           </div>
-          
+
           <div className="space-y-4">
             <div className="space-y-1">
               <label className="text-sm font-medium text-gray-700">Area Name</label>
               <input type="text" value={area.areaName} onChange={(e) => handleJobAreaChange(area.id, 'areaName', e.target.value)} placeholder="e.g. Master Bedroom" className="w-full p-2 border border-gray-300 rounded-md outline-none focus:ring-2 focus:ring-brand-blue font-semibold" />
             </div>
-            
+
             <div className="space-y-1">
               <label className="text-sm font-medium text-gray-700">Tasks (One per line)</label>
               <textarea rows={4} value={area.tasks} onChange={(e) => handleJobAreaChange(area.id, 'tasks', e.target.value)} placeholder="- Prep walls&#10;- Apply 2 coats of paint" className="w-full p-2 border border-gray-300 rounded-md outline-none focus:ring-2 focus:ring-brand-blue resize-y" />
@@ -189,7 +229,7 @@ export default function EstimateForm({ estimateId }: { estimateId?: string }) {
         </section>
       ))}
 
-      <button 
+      <button
         onClick={addJobArea}
         className="w-full py-4 border-2 border-dashed border-gray-300 text-gray-600 font-bold rounded-xl hover:border-brand-blue hover:text-brand-blue hover:bg-blue-50 transition-all"
       >
@@ -199,9 +239,9 @@ export default function EstimateForm({ estimateId }: { estimateId?: string }) {
       <div className="bg-brand-brown text-white p-6 rounded-xl shadow-lg flex flex-col gap-4">
         <div className="flex justify-between items-center border-b border-white border-opacity-20 pb-4">
           <label className="flex items-center gap-2 text-sm text-gray-200 cursor-pointer hover:text-white transition-colors">
-            <input 
-              type="checkbox" 
-              checked={formData.showLineItemPrices} 
+            <input
+              type="checkbox"
+              checked={formData.showLineItemPrices}
               onChange={(e) => setFormData(prev => ({ ...prev, showLineItemPrices: e.target.checked }))}
               className="w-4 h-4 rounded text-brand-blue accent-brand-blue cursor-pointer"
             />
@@ -209,21 +249,29 @@ export default function EstimateForm({ estimateId }: { estimateId?: string }) {
           </label>
         </div>
 
-        <div className="flex flex-col sm:flex-row justify-between items-center gap-4">
+        <div className="flex flex-col lg:flex-row justify-between items-center gap-4">
           <div className="text-xl">
-            <span className="text-gray-300 mr-2">Grand Total:</span> 
+            <span className="text-gray-300 mr-2">Grand Total:</span>
             <span className="font-bold text-brand-green bg-white px-3 py-1 rounded-md shadow-sm">${grandTotal.toFixed(2)}</span>
           </div>
 
-          <div className="flex gap-3 w-full sm:w-auto">
-            <button onClick={handleSaveToCloud} disabled={isSaving} className={`px-6 py-2 rounded-md font-bold transition-colors shadow-sm w-full sm:w-auto ${isSaving ? 'bg-gray-500' : 'bg-brand-amber hover:bg-opacity-90 text-white'}`}>
-              {isSaving ? (estimateId ? "Updating..." : "Saving...") : (estimateId ? "Update Database" : "Save to Database")}
+          <div className="flex flex-wrap gap-3 w-full lg:w-auto justify-end">
+            <button onClick={handleSaveToCloud} disabled={isSaving} className={`px-4 py-2 rounded-md font-bold transition-colors shadow-sm ${isSaving ? 'bg-gray-500' : 'bg-brand-amber hover:bg-opacity-90 text-white'}`}>
+              {isSaving ? (estimateId ? "Updating..." : "Saving...") : (estimateId ? "Update" : "Save")}
             </button>
-            <button 
-              onClick={() => PDFService.generateEstimatePDF(formData)} 
-              className="px-6 py-2 bg-brand-blue hover:bg-opacity-90 text-white rounded-md font-bold transition-colors shadow-sm w-full sm:w-auto"
+            <button
+              onClick={() => PDFService.generateEstimatePDF(formData)}
+              className="px-4 py-2 bg-gray-600 hover:bg-opacity-90 text-white rounded-md font-bold transition-colors shadow-sm"
             >
-              Generate PDF
+              View PDF
+            </button>
+            {/* --- THE SEND BUTTON --- */}
+            <button
+              onClick={handleSendEmail}
+              disabled={isSending}
+              className={`px-4 py-2 rounded-md font-bold transition-colors shadow-sm ${isSending ? 'bg-gray-400 text-white' : 'bg-brand-blue hover:bg-opacity-90 text-white'}`}
+            >
+              {isSending ? "Sending..." : "📧 Send to Client"}
             </button>
           </div>
         </div>

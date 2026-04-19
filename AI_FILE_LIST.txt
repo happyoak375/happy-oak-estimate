@@ -1,0 +1,35 @@
+.
+├── C:\Users\Carlos\Documents\code\happy-oak-estimates
+├── next-env.d.ts
+├── next.config.ts
+├── package-lock.json
+├── package.json
+├── public
+├── src
+│   ├── app
+│   │   ├── api
+│   │   │   └── send-proposal
+│   │   ├── edit
+│   │   │   └── [id]
+│   │   ├── layout.tsx
+│   │   ├── login
+│   │   │   └── page.tsx
+│   │   ├── new
+│   │   │   └── page.tsx
+│   │   └── page.tsx
+│   ├── components
+│   │   ├── estimate
+│   │   │   └── EstimateForm.tsx
+│   │   └── layout
+│   │       └── Header.tsx
+│   ├── context
+│   │   └── AuthContext.tsx
+│   ├── lib
+│   │   ├── dbService.ts
+│   │   ├── firebase.ts
+│   │   └── pdfService.ts
+│   └── types
+│       └── estimate.ts
+└── tsconfig.json
+
+17 directories, 16 files
