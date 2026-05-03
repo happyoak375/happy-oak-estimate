@@ -21,8 +21,8 @@ export default function LoginPage() {
     try {
       await signInWithEmailAndPassword(auth, email, password);
       // If successful, push them straight into the Command Center
-      router.push("/");
-    } catch (err: any) {
+      router.push("/dashboard");
+    } catch (err: unknown) {
       console.error("Login failed:", err);
       setError("Invalid email or password. Please try again.");
       setIsLoggingIn(false);
@@ -32,11 +32,11 @@ export default function LoginPage() {
   return (
     <div className="min-h-screen bg-brand-canvas flex flex-col justify-center py-12 sm:px-6 lg:px-8">
       <div className="sm:mx-auto sm:w-full sm:max-w-md flex flex-col items-center">
-        <Image 
-          src="/logo.png" 
-          alt="Happy Oak Logo" 
-          width={150} 
-          height={150} 
+        <Image
+          src="/logo.png"
+          alt="Happy Oak Logo"
+          width={150}
+          height={150}
           className="object-contain drop-shadow-md mb-4"
           priority
         />

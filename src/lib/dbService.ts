@@ -12,10 +12,35 @@ import {
   deleteDoc,
 } from "firebase/firestore";
 import { db } from "./firebase";
-import { EstimateData } from "@/types/estimate";
+import { EstimateData, EstimateStatus } from "@/types/estimate";
 
+const VALID_STATUSES: EstimateStatus[] = ["Draft", "Sent", "Approved", "Declined"];
+
+/**
+ * Ensures the status strictly conforms to the EstimateStatus type.
+ * Acts as a fallback mechanism to prevent UI crashes from corrupted data.
+ */
+function normalizeStatus(status: unknown): EstimateStatus {
+  if (typeof status !== "string") return "Draft";
+
+  const match = VALID_STATUSES.find(
+    (validStatus) => validStatus.toLowerCase() === status.toLowerCase(),
+  );
+
+  return match || "Draft";
+}
+
+/**
+ * Core Database Service handling all Firestore CRUD operations for the ERP.
+ * Note: Errors are intentionally left to bubble up so they can be caught and handled 
+ * by the UI layer (e.g., showing a toast notification to the user).
+ */
 export const DatabaseService = {
-  // 1. Check if a customer exists, save them if they are new
+  /**
+   * Checks if a customer exists by name and creates a new record if they don't.
+   * @param clientName - The full name of the client.
+   * @returns The Firestore Document ID of the new or existing customer, or null if no name provided.
+   */
   async saveCustomerIfNew(clientName: string) {
     if (!clientName) return null;
 
@@ -34,22 +59,32 @@ export const DatabaseService = {
     return querySnapshot.docs[0].id;
   },
 
-  // 2. Save the proposal to the database
+  /**
+   * Creates a new estimate/proposal in the database.
+   * @param estimateData - The data payload for the new estimate.
+   * @returns The newly generated Firestore Document ID.
+   */
   async saveProposal(estimateData: EstimateData) {
     await this.saveCustomerIfNew(estimateData.clientName);
 
+    // Prevent saving the local 'id' property into the Firestore document fields
+    const { id: _, ...dataToSave } = estimateData;
+
     const proposalsRef = collection(db, "proposals");
     const docRef = await addDoc(proposalsRef, {
-      ...estimateData,
-      status: "draft",
+      ...dataToSave,
+      status: normalizeStatus(estimateData.status),
       createdAt: serverTimestamp(),
     });
 
     return docRef.id;
   },
 
-  // 3. Get proposals ordered by newest first
-  async getProposals() {
+  /**
+   * Retrieves all proposals, ordered by creation date (newest first).
+   * @returns An array of EstimateData objects.
+   */
+  async getProposals(): Promise<EstimateData[]> {
     const proposalsRef = collection(db, "proposals");
     const q = query(proposalsRef, orderBy("createdAt", "desc"));
     const querySnapshot = await getDocs(q);
@@ -57,28 +92,47 @@ export const DatabaseService = {
     return querySnapshot.docs.map((doc) => ({
       id: doc.id,
       ...doc.data(),
-    }));
+      status: normalizeStatus(doc.data().status),
+    })) as EstimateData[];
   },
 
-  // --- NEW: Fetch a single proposal by its ID ---
-  async getProposalById(id: string) {
+  /**
+   * Fetches a single proposal by its unique Firestore ID.
+   * @param id - The Firestore Document ID.
+   * @returns The EstimateData object, or null if not found.
+   */
+  async getProposalById(id: string): Promise<EstimateData | null> {
     const docRef = doc(db, "proposals", id);
     const docSnap = await getDoc(docRef);
+    
     if (docSnap.exists()) {
-      return { id: docSnap.id, ...docSnap.data() };
+      const data = docSnap.data();
+      return { id: docSnap.id, ...data, status: normalizeStatus(data.status) } as EstimateData;
     }
     return null;
   },
 
-  // --- NEW: Update an existing proposal ---
+  /**
+   * Updates an existing proposal with new data.
+   * @param id - The Firestore Document ID of the proposal to update.
+   * @param estimateData - The updated data payload.
+   */
   async updateProposal(id: string, estimateData: EstimateData) {
+    // Prevent saving the local 'id' property into the Firestore document fields
+    const { id: _, ...dataToUpdate } = estimateData;
     const docRef = doc(db, "proposals", id);
+    
     await updateDoc(docRef, {
-      ...estimateData,
+      ...dataToUpdate,
+      status: normalizeStatus(estimateData.status),
       updatedAt: serverTimestamp(),
     });
   },
 
+  /**
+   * Permanently deletes a proposal from the database.
+   * @param id - The Firestore Document ID.
+   */
   async deleteProposal(id: string) {
     const docRef = doc(db, "proposals", id);
     await deleteDoc(docRef);

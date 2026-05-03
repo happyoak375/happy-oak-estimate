@@ -1,12 +1,20 @@
 import { Resend } from 'resend';
 import { NextResponse } from 'next/server';
+import { requireAuthenticatedRequest } from '@/lib/serverAuth';
 
 const resend = new Resend(process.env.RESEND_API_KEY);
 
 export async function POST(request: Request) {
   try {
+    const auth = await requireAuthenticatedRequest(request);
+    if (auth.response) return auth.response;
+
     // 1. Read the request body ONLY ONCE
     const { email, clientName, estimateName, pdfBase64 } = await request.json();
+
+    if (!email || !clientName || !pdfBase64) {
+      return NextResponse.json({ error: 'Email, client name, and PDF are required' }, { status: 400 });
+    }
 
     // 2. Generate the mmddyyyy date
     const rightNow = new Date();
@@ -20,7 +28,7 @@ export async function POST(request: Request) {
 
     // 4. Send the email (NEW: Extracting data AND error)
     const { data, error } = await resend.emails.send({
-      from: 'Happy Oak Painting <onboarding@resend.dev>', // The default testing address
+      from: 'Carlos Quintero <estimates@happyoakpainting.com>', // The default testing address
       to: email, // During testing, this MUST be your own Resend account email!
       subject: `Your Proposal from Happy Oak Painting: ${estimateName}`,
       html: `

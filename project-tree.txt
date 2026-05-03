@@ -1,0 +1,94 @@
+.
+├── AI_FILE_LIST.txt
+├── C:\Users\Carlos\Documents\code\happy-oak-estimates
+├── README.md
+├── eslint.config.mjs
+├── firebase.json
+├── firestore.indexes.json
+├── firestore.rules
+├── next-env.d.ts
+├── next.config.ts
+├── package-lock.json
+├── package.json
+├── postcss.config.mjs
+├── project-tree.txt
+├── public
+│   ├── img
+│   │   ├── azek-power-washed.webp
+│   │   ├── basement-before-after-01.png
+│   │   ├── basement-floor-epoxy-painting-job.webp
+│   │   ├── basement-painting-job.webp
+│   │   ├── ceiling-teak-oil-job.webp
+│   │   ├── closet-painting-job.webp
+│   │   ├── deck-and-handrail-staining-job.webp
+│   │   ├── deck-before-after.png
+│   │   ├── deck-painting-job.png
+│   │   ├── deck-refinished-teak-oil.webp
+│   │   ├── deck-refinishing-job.webp
+│   │   ├── deck-staining-job-and-handrail.webp
+│   │   ├── family-room-after.png
+│   │   ├── fence.png
+│   │   ├── floor-installation-outdoor.webp
+│   │   ├── front-gate-teak-oil.webp
+│   │   ├── front-porch-teak-oil.webp
+│   │   ├── front-shed-painting-job.webp
+│   │   ├── full-house-pressure-washing.webp
+│   │   ├── hallway-restoration.jpg
+│   │   ├── header-bg-1.png
+│   │   ├── interior-walls-celing-and-floor.webp
+│   │   ├── kitchen after.webp
+│   │   ├── kitchen-and-family-room-after.webp
+│   │   ├── kitchen-before-after-01.png
+│   │   ├── kitchen-cabinets-painting-job.webp
+│   │   ├── kitchen-family-room.png
+│   │   ├── logo-on-lake-slim.png
+│   │   ├── mahogany-deck-teak-oil.webp
+│   │   ├── patio-floor-installation.png
+│   │   ├── patio-power-washed.webp
+│   │   ├── pressure-washer-01.png
+│   │   ├── pressure-washer-02.png
+│   │   ├── pressure-washer-03.png
+│   │   ├── pressure-washer-04.png
+│   │   ├── refinished-deck.png
+│   │   ├── shed-painting-job.webp
+│   │   ├── small-acorn.png
+│   │   ├── small-garden-fence-painting.webp
+│   │   ├── stairway-paint-and-carpet.webp
+│   │   ├── stairway-refinishing-job.webp
+│   │   ├── storage-room-painting-job.webp
+│   │   ├── storage-room-refinishing.webp
+│   │   ├── storage.png
+│   │   ├── teak-oil-job.webp
+│   │   ├── walkway-power-washed.webp
+│   │   ├── window-staining-and-varnishing.webp
+│   │   └── window-staining.png
+│   └── logo.png
+├── src
+│   ├── app
+│   │   ├── api
+│   │   ├── dashboard
+│   │   ├── edit
+│   │   ├── favicon.ico
+│   │   ├── globals.css
+│   │   ├── layout.tsx
+│   │   ├── login
+│   │   ├── new
+│   │   └── page.tsx
+│   ├── components
+│   │   ├── auth
+│   │   ├── estimate
+│   │   └── layout
+│   ├── context
+│   │   └── AuthContext.tsx
+│   ├── lib
+│   │   ├── dbService.ts
+│   │   ├── firebase.ts
+│   │   ├── pdfService.ts
+│   │   ├── serverAuth.ts
+│   │   └── templates.ts
+│   └── types
+│       └── estimate.ts
+├── tailwind.config.ts
+└── tsconfig.json
+
+18 directories, 74 files

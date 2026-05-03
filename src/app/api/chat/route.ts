@@ -1,5 +1,10 @@
 import { NextResponse } from 'next/server';
 
+type ChatMessage = {
+  role: string;
+  content: string;
+};
+
 export async function POST(request: Request) {
   try {
     // 1. Read the incoming data (Next.js way)
@@ -58,7 +63,7 @@ export async function POST(request: Request) {
 
       try {
         const conversationText = messages
-          .map((m: any) => `${m.role}: ${m.content}`)
+          .map((m: ChatMessage) => `${m.role}: ${m.content}`)
           .join("\n");
           
         const extractorPrompt = `Extract the customer's Name, Email, Phone, and Project from this conversation history:\n${conversationText}\n\nFormat it exactly like this:\nName: [Name]\nEmail: [Email]\nPhone: [Phone]\nProject: [Project]\nDo not add any other words.`;

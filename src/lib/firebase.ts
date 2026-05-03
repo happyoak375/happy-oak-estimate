@@ -2,6 +2,10 @@ import { initializeApp, getApps, getApp } from "firebase/app";
 import { getFirestore } from "firebase/firestore";
 import { getAuth } from "firebase/auth";
 
+/**
+ * Firebase configuration object utilizing Next.js environment variables.
+ * These variables must be strictly defined in your .env.local file.
+ */
 const firebaseConfig = {
   apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
   authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN,
@@ -11,13 +15,21 @@ const firebaseConfig = {
   appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
 };
 
-// Initialize Firebase (This checks if it's already running to prevent errors)
+/**
+ * Initialize Firebase Application.
+ * Utilizes the singleton pattern to prevent re-initialization errors during 
+ * Next.js Hot Module Replacement (HMR) or Server-Side Rendering (SSR).
+ */
 const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
 
-// Initialize Database and Auth
+/**
+ * Firestore Database instance for all CRUD operations.
+ */
 const db = getFirestore(app);
-// FIXED: Changed 'auth3' to 'auth'
+
+/**
+ * Firebase Authentication instance for managing user sessions and security.
+ */
 const auth = getAuth(app);
 
-// Export everything cleanly at the bottom
 export { app, db, auth };

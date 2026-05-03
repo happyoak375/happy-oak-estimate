@@ -1,21 +1,31 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { getIdToken } from "firebase/auth";
+import { useRouter } from "next/navigation";
 import { EstimateData, JobArea } from "@/types/estimate";
 import { DatabaseService } from "@/lib/dbService";
+import { auth } from "@/lib/firebase";
 import { PDFService } from "@/lib/pdfService";
+import { JOB_TEMPLATES } from "@/lib/templates";
 
 const generateId = () => Math.random().toString(36).substr(2, 9);
 
+function getErrorMessage(error: unknown) {
+  return error instanceof Error ? error.message : "Something went wrong";
+}
+
 export default function EstimateForm({ estimateId }: { estimateId?: string }) {
+  const router = useRouter();
   const [formData, setFormData] = useState<EstimateData>({
     estimateName: "",
     clientName: "",
-    clientEmail: "", // Required for Resend
+    clientEmail: "",
     street: "",
     cityStateZip: "",
     showLineItemPrices: true,
     status: "Draft",
+    materialExceptions: "", // <--- Added to initial state
     jobAreas: [{ id: generateId(), areaName: "", tasks: "", exceptions: "", price: "" }],
   });
 
@@ -31,12 +41,15 @@ export default function EstimateForm({ estimateId }: { estimateId?: string }) {
       try {
         const data = await DatabaseService.getProposalById(estimateId);
         if (data) {
-          const loadedData = data as EstimateData;
+          const loadedData = data as unknown as EstimateData;
           if (!loadedData.jobAreas || loadedData.jobAreas.length === 0) {
             loadedData.jobAreas = [{ id: generateId(), areaName: "", tasks: "", exceptions: "", price: "" }];
           }
           if (loadedData.showLineItemPrices === undefined) {
             loadedData.showLineItemPrices = true;
+          }
+          if (loadedData.materialExceptions === undefined) {
+            loadedData.materialExceptions = "";
           }
           setFormData(loadedData);
         }
@@ -62,6 +75,27 @@ export default function EstimateForm({ estimateId }: { estimateId?: string }) {
         area.id === id ? { ...area, [field]: value } : area
       )
     }));
+  };
+
+  const applyTemplate = (id: string, templateKey: string) => {
+    if (!templateKey) return;
+
+    const template = JOB_TEMPLATES[templateKey];
+    if (template) {
+      setFormData((prev) => ({
+        ...prev,
+        jobAreas: prev.jobAreas.map((area) =>
+          area.id === id
+            ? {
+              ...area,
+              areaName: templateKey,
+              tasks: template.tasks,
+              exceptions: template.exceptions || area.exceptions
+            }
+            : area
+        )
+      }));
+    }
   };
 
   const addJobArea = () => {
@@ -119,10 +153,20 @@ export default function EstimateForm({ estimateId }: { estimateId?: string }) {
 
     try {
       const pdfBase64 = await PDFService.generateEstimatePDFBase64(formData);
+      const currentUser = auth.currentUser;
+
+      if (!currentUser) {
+        throw new Error("You must be signed in to send proposals.");
+      }
+
+      const token = await getIdToken(currentUser);
 
       const response = await fetch('/api/send-proposal', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
         body: JSON.stringify({
           email: formData.clientEmail,
           clientName: formData.clientName,
@@ -131,13 +175,27 @@ export default function EstimateForm({ estimateId }: { estimateId?: string }) {
         }),
       });
 
-      if (!response.ok) throw new Error("Failed to send");
+      // --- NEW: Read the actual error from the backend ---
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || `Server responded with status ${response.status}`);
+      }
 
-      setFormData(prev => ({ ...prev, status: "Sent" }));
+      const sentFormData: EstimateData = { ...formData, status: "Sent" };
+
+      if (estimateId) {
+        await DatabaseService.updateProposal(estimateId, sentFormData);
+      } else {
+        const savedEstimateId = await DatabaseService.saveProposal(sentFormData);
+        router.replace(`/edit/${savedEstimateId}`);
+      }
+
+      setFormData(sentFormData);
       setStatusMessage({ text: "Success! Email sent to client.", type: "success" });
     } catch (error) {
       console.error(error);
-      setStatusMessage({ text: "Failed to send email. Check console.", type: "error" });
+      // --- NEW: Display the real error message in the UI ---
+      setStatusMessage({ text: `Failed: ${getErrorMessage(error)}`, type: "error" });
     } finally {
       setIsSending(false);
     }
@@ -161,7 +219,6 @@ export default function EstimateForm({ estimateId }: { estimateId?: string }) {
             <label className="text-sm font-medium text-gray-700">Client Name</label>
             <input type="text" name="clientName" value={formData.clientName} onChange={handleTopLevelChange} placeholder="John Doe" className="w-full p-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-brand-blue outline-none" />
           </div>
-          {/* --- THE MISSING EMAIL FIELD --- */}
           <div className="space-y-1">
             <label className="text-sm font-medium text-gray-700">Client Email</label>
             <input type="email" name="clientEmail" value={formData.clientEmail || ""} onChange={handleTopLevelChange} placeholder="client@email.com" className="w-full p-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-brand-blue outline-none" />
@@ -205,6 +262,20 @@ export default function EstimateForm({ estimateId }: { estimateId?: string }) {
           </div>
 
           <div className="space-y-4">
+            <div className="bg-blue-50 p-3 rounded-md border border-blue-100">
+              <label className="text-sm font-semibold text-brand-blue block mb-1">⚡ Quick-Fill Template</label>
+              <select
+                onChange={(e) => applyTemplate(area.id, e.target.value)}
+                className="w-full p-2 border border-blue-200 rounded-md outline-none focus:ring-2 focus:ring-brand-blue text-sm bg-white"
+                defaultValue=""
+              >
+                <option value="" disabled>-- Select a template to auto-fill --</option>
+                {Object.keys(JOB_TEMPLATES).map((key) => (
+                  <option key={key} value={key}>{key}</option>
+                ))}
+              </select>
+            </div>
+
             <div className="space-y-1">
               <label className="text-sm font-medium text-gray-700">Area Name</label>
               <input type="text" value={area.areaName} onChange={(e) => handleJobAreaChange(area.id, 'areaName', e.target.value)} placeholder="e.g. Master Bedroom" className="w-full p-2 border border-gray-300 rounded-md outline-none focus:ring-2 focus:ring-brand-blue font-semibold" />
@@ -236,6 +307,23 @@ export default function EstimateForm({ estimateId }: { estimateId?: string }) {
         + Add Another Job Area
       </button>
 
+      {/* --- NEW GLOBAL SETTINGS SECTION --- */}
+      <section className="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
+        <h2 className="text-lg font-bold text-brand-brown mb-4 border-b border-gray-100 pb-2">Global Settings & Materials</h2>
+        <div className="space-y-1">
+          <label className="text-sm font-medium text-gray-700">Global Material Exceptions (Appears in Footer)</label>
+          <input
+            type="text"
+            name="materialExceptions"
+            value={formData.materialExceptions || ""}
+            onChange={handleTopLevelChange}
+            placeholder="e.g. Paint, Deck Stain, specialized hardware"
+            className="w-full p-2 border border-gray-300 rounded-md outline-none focus:ring-2 focus:ring-brand-blue"
+          />
+          <p className="text-xs text-gray-500 mt-1">If left blank, the contract will state that ALL materials are included.</p>
+        </div>
+      </section>
+
       <div className="bg-brand-brown text-white p-6 rounded-xl shadow-lg flex flex-col gap-4">
         <div className="flex justify-between items-center border-b border-white border-opacity-20 pb-4">
           <label className="flex items-center gap-2 text-sm text-gray-200 cursor-pointer hover:text-white transition-colors">
@@ -252,7 +340,7 @@ export default function EstimateForm({ estimateId }: { estimateId?: string }) {
         <div className="flex flex-col lg:flex-row justify-between items-center gap-4">
           <div className="text-xl">
             <span className="text-gray-300 mr-2">Grand Total:</span>
-            <span className="font-bold text-brand-green bg-white px-3 py-1 rounded-md shadow-sm">${grandTotal.toFixed(2)}</span>
+            <span className="font-bold text-brand-green bg-white px-3 py-1 rounded-md shadow-sm">${grandTotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
           </div>
 
           <div className="flex flex-wrap gap-3 w-full lg:w-auto justify-end">
@@ -265,7 +353,6 @@ export default function EstimateForm({ estimateId }: { estimateId?: string }) {
             >
               View PDF
             </button>
-            {/* --- THE SEND BUTTON --- */}
             <button
               onClick={handleSendEmail}
               disabled={isSending}
