@@ -2,31 +2,40 @@ import { Resend } from 'resend';
 import { NextResponse } from 'next/server';
 import { requireAuthenticatedRequest } from '@/lib/serverAuth';
 
-const resend = new Resend(process.env.RESEND_API_KEY);
+// Notice: We removed the `const resend = new Resend(...)` from up here!
 
 export async function POST(request: Request) {
   try {
     const auth = await requireAuthenticatedRequest(request);
     if (auth.response) return auth.response;
 
-    // 1. Read the request body ONLY ONCE
+    // --- 1. INITIALIZE RESEND SAFELY INSIDE THE FUNCTION ---
+    const apiKey = process.env.RESEND_API_KEY;
+    if (!apiKey) {
+      console.error("Missing RESEND_API_KEY environment variable");
+      return NextResponse.json({ error: "Email configuration error on server" }, { status: 500 });
+    }
+    const resend = new Resend(apiKey);
+    // ------------------------------------------------------
+
+    // 2. Read the request body ONLY ONCE
     const { email, clientName, estimateName, pdfBase64 } = await request.json();
 
     if (!email || !clientName || !pdfBase64) {
       return NextResponse.json({ error: 'Email, client name, and PDF are required' }, { status: 400 });
     }
 
-    // 2. Generate the mmddyyyy date
+    // 3. Generate the mmddyyyy date
     const rightNow = new Date();
     const mm = String(rightNow.getMonth() + 1).padStart(2, "0");
     const dd = String(rightNow.getDate()).padStart(2, "0");
     const yyyy = rightNow.getFullYear();
     const dateString = `${mm}${dd}${yyyy}`;
 
-    // 3. Clean up the estimate name
+    // 4. Clean up the estimate name
     const safeEstimateName = (estimateName || "Estimate").replace(/[^a-z0-9]/gi, "_");
 
-    // 4. Send the email (NEW: Extracting data AND error)
+    // 5. Send the email 
     const { data, error } = await resend.emails.send({
       from: 'Carlos Quintero <estimates@happyoakpainting.com>', // The default testing address
       to: email, // During testing, this MUST be your own Resend account email!
@@ -44,14 +53,13 @@ export async function POST(request: Request) {
       `,
       attachments: [
         {
-          // 5. USE the new variables here to name the file!
           filename: `Proposal-${dateString}-${safeEstimateName}.pdf`,
           content: pdfBase64,
         },
       ],
     });
 
-    // NEW: Check if Resend returned an error silently
+    // 6. Check if Resend returned an error silently
     if (error) {
       console.error("Resend API Error:", error);
       return NextResponse.json({ error: error.message }, { status: 400 });
