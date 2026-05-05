@@ -57,7 +57,7 @@ export default function LandingPage() {
   };
 
   return (
-    <div className="font-sans text-gray-800 bg-[url('/img/HOPLogoBG.png')] bg-repeat">
+    <div className="font-sans text-gray-800 bg-[url('/logo.png')] bg-repeat">
 
       {/* HEADER */}
       <header className="w-full h-[700px] bg-brand-brown bg-[url('/img/header-bg-1.png')] bg-cover bg-fixed bg-center relative">
