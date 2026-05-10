@@ -153,6 +153,9 @@ export default function EstimateForm({ estimateId }: { estimateId?: string }) {
 
     try {
       const pdfBase64 = await PDFService.generateEstimatePDFBase64(formData);
+
+      const cleanPdfBase64 = pdfBase64.split("base64,")[1] || pdfBase64;
+
       const currentUser = auth.currentUser;
 
       if (!currentUser) {
@@ -171,7 +174,7 @@ export default function EstimateForm({ estimateId }: { estimateId?: string }) {
           email: formData.clientEmail,
           clientName: formData.clientName,
           estimateName: formData.estimateName || "Project Estimate",
-          pdfBase64: pdfBase64,
+          pdfBase64: cleanPdfBase64,
         }),
       });
 
