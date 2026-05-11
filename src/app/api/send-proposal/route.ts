@@ -1,3 +1,6 @@
+export const dynamic = 'force-dynamic';
+export const runtime = 'nodejs';
+
 import { Resend } from 'resend';
 import { NextResponse } from 'next/server';
 import { requireAuthenticatedRequest } from '@/lib/serverAuth';
@@ -5,6 +8,7 @@ import { requireAuthenticatedRequest } from '@/lib/serverAuth';
 // Notice: We removed the `const resend = new Resend(...)` from up here!
 
 export async function POST(request: Request) {
+  console.log("LOG: API Route reached. Checking payload size..");
   try {
     const auth = await requireAuthenticatedRequest(request);
     if (auth.response) return auth.response;
