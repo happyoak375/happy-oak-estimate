@@ -1,14 +1,34 @@
 export const JOB_TEMPLATES: Record<string, { tasks: string; exceptions?: string }> = {
   "Deck Refinishing": {
-    tasks: "Move all items and furniture off the deck surfaces.\nSpray deck surfaces with Jo-max to kill mold and mildew.\nPressure wash all deck surfaces.\nSand deck surfaces to prepare for staining.\nApply premium stain to all surfaces.",
-    exceptions: "Structural repairs not included unless specified."
+    tasks: "Move all items and furniture off the deck surfaces.\nSpray deck surfaces with Jo-max to kill mold and mildew.\nPressure wash all deck surfaces.\nSand deck surfaces to prepare for staining.\nApply premium stain to deck floor boards.\nStain and seal handrails and spindles.",
+    exceptions: "Structural repairs or board replacements not included unless specified."
   },
-  "Interior Painting": {
-    tasks: "Cover floors and furniture with drop cloths.\nPatch small holes and cracks in walls.\nSand and prime patched areas.\nApply two coats of premium paint.\nRemove trash and vacuum work area.",
-    exceptions: "Moving of heavy electronics/pianos not included."
+  "Interior Painting (General)": {
+    tasks: "Cover floors and furniture with drop cloths and plastic.\nPatch small holes and cracks in drywall.\nApply premium caulking to baseboards, trim, and gaps.\nSand and spot-prime patched areas.\nApply two coats of premium interior paint to walls and trim.\nRemove trash and vacuum work area.",
+    exceptions: "Moving of heavy electronics, pianos, or delicate antiques not included."
   },
   "Exterior House Wash": {
-    tasks: "Apply eco-friendly detergent to siding.\nLow-pressure wash to remove dirt and oxidation.\nHand-scrub heavily soiled areas.\nClean exterior of all windows.",
-    exceptions: "Oxidation removal on gutters may require extra fee."
+    tasks: "Apply eco-friendly detergent to siding.\nLow-pressure power wash to remove dirt, mildew, and oxidation.\nHand-scrub heavily soiled areas.\nClean exterior of all easily accessible windows.",
+    exceptions: "Oxidation removal on gutters or high-reach window cleaning may require an extra fee."
+  },
+  "Exterior Painting & Trim": {
+    tasks: "Power wash exterior surfaces to remove loose debris and dirt.\nScrape peeling areas and feather-sand edges smooth.\nApply premium exterior primer to raw wood and Azek/PVC trim.\nApply premium exterior caulking to joints and seams to prevent water intrusion.\nApply two coats of premium exterior architectural coatings.",
+    exceptions: "Replacement of rotten wood is not included unless specified in a Carpentry line item."
+  },
+  "Carpentry Repairs": {
+    tasks: "Carefully remove rotted or damaged wood from designated areas.\nMeasure, cut, and install premium replacement wood or Azek/PVC boards.\nSecure all new materials with galvanized or stainless steel fasteners.\nFill nail holes and sand flush, ready for paint.",
+    exceptions: "Painting of new carpentry is billed separately unless bundled into an Exterior Painting package."
+  },
+  "Bathroom / Moisture-Area Painting": {
+    tasks: "Protect vanity, tub, and fixtures with plastic shielding.\nTreat surfaces with mold/mildew-killing solutions where necessary.\nApply premium waterproof caulking to trim and wet-area borders.\nApply moisture-resistant, premium interior paint to walls and ceiling.",
+    exceptions: "Plumbing modifications, hardware installation, or tile work not included."
+  },
+  "Basement / Mud Room Refinishing": {
+    tasks: "Clear out and protect the work area with heavy-duty drop cloths.\nRepair scuffs, dings, and drywall damage common in high-traffic zones.\nApply premium, scuff-resistant paint to walls and trim for maximum durability.\nClean and reset the space.",
+    exceptions: "Waterproofing of foundation walls is not included unless specified."
+  },
+  "Light Electrical / Fixture Swap": {
+    tasks: "Safely disconnect power to the designated work area.\nRemove existing light fixtures or outlet covers.\nInstall new client-provided fixtures, switches, or faceplates.\nTest connections to ensure proper functionality.",
+    exceptions: "Major rewiring, panel upgrades, or supplying the actual fixtures is not included."
   }
 };
