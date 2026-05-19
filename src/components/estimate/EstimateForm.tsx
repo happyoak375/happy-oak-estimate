@@ -33,6 +33,8 @@ export default function EstimateForm({ estimateId }: { estimateId?: string }) {
   const [isSending, setIsSending] = useState(false);
   const [isLoading, setIsLoading] = useState(!!estimateId);
   const [statusMessage, setStatusMessage] = useState<{ text: string; type: "error" | "success" | "info" } | null>(null);
+  const [importText, setImportText] = useState("");
+  const [isImporting, setIsImporting] = useState(false);
 
   // Fetch data if we are in Edit Mode
   useEffect(() => {
@@ -116,6 +118,59 @@ export default function EstimateForm({ estimateId }: { estimateId?: string }) {
     const areaPrice = Number(area.price) || 0;
     return total + areaPrice;
   }, 0);
+
+  // --- AI QUICK IMPORT LOGIC ---
+  const handleQuickImport = async () => {
+    if (!importText.trim()) {
+      setStatusMessage({ text: "Please paste a WhatsApp message to import.", type: "error" });
+      return;
+    }
+
+    setIsImporting(true);
+    setStatusMessage({ text: "✨ AI is translating and building your estimate...", type: "info" });
+
+    try {
+      const response = await fetch("/api/refine-estimate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text: importText }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || `Server responded with status ${response.status}`);
+      }
+
+      const aiData = await response.json();
+
+      // Map the perfectly structured AI JSON directly into your form state
+      setFormData((prev) => ({
+        ...prev,
+        estimateName: aiData.estimateName || prev.estimateName,
+        clientName: aiData.clientName || prev.clientName,
+        clientEmail: aiData.clientEmail || prev.clientEmail,
+        street: aiData.street || prev.street,
+        // Map AI job areas and generate fresh IDs for the UI
+        jobAreas: aiData.jobAreas && aiData.jobAreas.length > 0
+          ? aiData.jobAreas.map((area: Partial<JobArea>) => ({
+            id: generateId(),
+            areaName: area.areaName || "",
+            tasks: area.tasks || "",
+            exceptions: area.exceptions || "",
+            price: area.price || "",
+          }))
+          : prev.jobAreas,
+      }));
+
+      setImportText(""); // Clear the text area on success
+      setStatusMessage({ text: "Success! Proposal translated and imported.", type: "success" });
+    } catch (error) {
+      console.error("Import Error:", error);
+      setStatusMessage({ text: `Failed: ${getErrorMessage(error)}`, type: "error" });
+    } finally {
+      setIsImporting(false);
+    }
+  };
 
   // Save OR Update depending on mode
   const handleSaveToCloud = async () => {
@@ -209,169 +264,197 @@ export default function EstimateForm({ estimateId }: { estimateId?: string }) {
   }
 
   return (
-    <div className="max-w-5xl mx-auto space-y-6 pb-20">
-      <section className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 border-t-4 border-t-brand-brown">
-        <h2 className="text-lg font-semibold text-brand-brown mb-4">Project Details</h2>
+    <>
+      {/* --- ✨ AI QUICK IMPORT UI --- */}
+      <div className="mb-8 p-6 bg-blue-50 border border-blue-200 rounded-xl shadow-sm">
+        <h3 className="text-lg font-bold text-brand-blue mb-2">✨ AI Quick Import</h3>
+        <p className="text-sm text-gray-600 mb-4">
+          Paste the salesman's raw WhatsApp notes below to instantly translate and generate the proposal.
+        </p>
+        <textarea
+          value={importText}
+          onChange={(e) => setImportText(e.target.value)}
+          rows={4}
+          placeholder="e.g., Cliente: Juan. Trabajo interior, pintar paredes, poner coking. Baño: 1500..."
+          className="w-full p-3 border border-gray-300 rounded-md outline-none focus:ring-2 focus:ring-brand-blue mb-4"
+        />
+        <button
+          type="button"
+          onClick={handleQuickImport}
+          disabled={isImporting}
+          className={`w-full py-3 font-bold rounded-md transition-all ${isImporting
+            ? "bg-gray-400 text-white cursor-not-allowed"
+            : "bg-brand-blue text-white hover:bg-blue-700 shadow-md"
+            }`}
+        >
+          {isImporting ? "Translating..." : "Translate & Import"}
+        </button>
+      </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-          <div className="space-y-1">
-            <label className="text-sm font-medium text-gray-700">Estimate Name</label>
-            <input type="text" name="estimateName" value={formData.estimateName} onChange={handleTopLevelChange} placeholder="e.g. Interior Paint" className="w-full p-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-brand-blue outline-none" />
-          </div>
-          <div className="space-y-1">
-            <label className="text-sm font-medium text-gray-700">Client Name</label>
-            <input type="text" name="clientName" value={formData.clientName} onChange={handleTopLevelChange} placeholder="John Doe" className="w-full p-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-brand-blue outline-none" />
-          </div>
-          <div className="space-y-1">
-            <label className="text-sm font-medium text-gray-700">Client Email</label>
-            <input type="email" name="clientEmail" value={formData.clientEmail || ""} onChange={handleTopLevelChange} placeholder="client@email.com" className="w-full p-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-brand-blue outline-none" />
-          </div>
-          <div className="space-y-1">
-            <label className="text-sm font-medium text-gray-700">Proposal Status</label>
-            <select
-              name="status"
-              value={formData.status || "Draft"}
-              onChange={handleTopLevelChange}
-              className="w-full p-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-brand-blue outline-none bg-white font-semibold text-brand-brown"
-            >
-              <option value="Draft">Draft</option>
-              <option value="Sent">Sent to Client</option>
-              <option value="Approved">Approved (Won)</option>
-              <option value="Declined">Declined (Lost)</option>
-            </select>
-          </div>
-          <div className="space-y-1 lg:col-span-2">
-            <label className="text-sm font-medium text-gray-700">Street Address</label>
-            <input type="text" name="street" value={formData.street} onChange={handleTopLevelChange} placeholder="123 Main St" className="w-full p-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-brand-blue outline-none" />
-          </div>
-          <div className="space-y-1 lg:col-span-2">
-            <label className="text-sm font-medium text-gray-700">City, State, ZIP</label>
-            <input type="text" name="cityStateZip" value={formData.cityStateZip} onChange={handleTopLevelChange} placeholder="Bernardsville, NJ 07924" className="w-full p-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-brand-blue outline-none" />
-          </div>
-        </div>
-      </section>
+      <div className="max-w-5xl mx-auto space-y-6 pb-20">
+        <section className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 border-t-4 border-t-brand-brown">
+          <h2 className="text-lg font-semibold text-brand-brown mb-4">Project Details</h2>
 
-      {formData.jobAreas.map((area, index) => (
-        <section key={area.id} className="bg-white p-6 rounded-xl shadow-sm border border-gray-200 relative">
-          <div className="flex justify-between items-center mb-4 pb-2 border-b border-gray-100">
-            <h2 className="text-lg font-bold text-brand-brown">
-              Job Area {index + 1}
-            </h2>
-            {formData.jobAreas.length > 1 && (
-              <button onClick={() => removeJobArea(area.id)} className="text-red-500 hover:text-red-700 text-sm font-semibold transition-colors">
-                ✕ Remove Area
-              </button>
-            )}
-          </div>
-
-          <div className="space-y-4">
-            <div className="bg-blue-50 p-3 rounded-md border border-blue-100">
-              <label className="text-sm font-semibold text-brand-blue block mb-1">⚡ Quick-Fill Template</label>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="space-y-1">
+              <label className="text-sm font-medium text-gray-700">Estimate Name</label>
+              <input type="text" name="estimateName" value={formData.estimateName} onChange={handleTopLevelChange} placeholder="e.g. Interior Paint" className="w-full p-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-brand-blue outline-none" />
+            </div>
+            <div className="space-y-1">
+              <label className="text-sm font-medium text-gray-700">Client Name</label>
+              <input type="text" name="clientName" value={formData.clientName} onChange={handleTopLevelChange} placeholder="John Doe" className="w-full p-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-brand-blue outline-none" />
+            </div>
+            <div className="space-y-1">
+              <label className="text-sm font-medium text-gray-700">Client Email</label>
+              <input type="email" name="clientEmail" value={formData.clientEmail || ""} onChange={handleTopLevelChange} placeholder="client@email.com" className="w-full p-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-brand-blue outline-none" />
+            </div>
+            <div className="space-y-1">
+              <label className="text-sm font-medium text-gray-700">Proposal Status</label>
               <select
-                onChange={(e) => applyTemplate(area.id, e.target.value)}
-                className="w-full p-2 border border-blue-200 rounded-md outline-none focus:ring-2 focus:ring-brand-blue text-sm bg-white"
-                defaultValue=""
+                name="status"
+                value={formData.status || "Draft"}
+                onChange={handleTopLevelChange}
+                className="w-full p-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-brand-blue outline-none bg-white font-semibold text-brand-brown"
               >
-                <option value="" disabled>-- Select a template to auto-fill --</option>
-                {Object.keys(JOB_TEMPLATES).map((key) => (
-                  <option key={key} value={key}>{key}</option>
-                ))}
+                <option value="Draft">Draft</option>
+                <option value="Sent">Sent to Client</option>
+                <option value="Approved">Approved (Won)</option>
+                <option value="Declined">Declined (Lost)</option>
               </select>
             </div>
-
-            <div className="space-y-1">
-              <label className="text-sm font-medium text-gray-700">Area Name</label>
-              <input type="text" value={area.areaName} onChange={(e) => handleJobAreaChange(area.id, 'areaName', e.target.value)} placeholder="e.g. Master Bedroom" className="w-full p-2 border border-gray-300 rounded-md outline-none focus:ring-2 focus:ring-brand-blue font-semibold" />
+            <div className="space-y-1 lg:col-span-2">
+              <label className="text-sm font-medium text-gray-700">Street Address</label>
+              <input type="text" name="street" value={formData.street} onChange={handleTopLevelChange} placeholder="123 Main St" className="w-full p-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-brand-blue outline-none" />
             </div>
-
-            <div className="space-y-1">
-              <label className="text-sm font-medium text-gray-700">Tasks (One per line)</label>
-              <textarea rows={4} value={area.tasks} onChange={(e) => handleJobAreaChange(area.id, 'tasks', e.target.value)} placeholder="- Prep walls&#10;- Apply 2 coats of paint" className="w-full p-2 border border-gray-300 rounded-md outline-none focus:ring-2 focus:ring-brand-blue resize-y" />
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="space-y-1">
-                <label className="text-sm font-medium text-gray-700">Exceptions</label>
-                <input type="text" value={area.exceptions} onChange={(e) => handleJobAreaChange(area.id, 'exceptions', e.target.value)} placeholder="e.g. Baseboards not included" className="w-full p-2 border border-gray-300 rounded-md outline-none focus:ring-2 focus:ring-brand-blue" />
-              </div>
-              <div className="space-y-1">
-                <label className="text-sm font-medium text-gray-700">Price for this Area ($)</label>
-                <input type="number" value={area.price} onChange={(e) => handleJobAreaChange(area.id, 'price', e.target.value)} placeholder="0.00" className="w-full p-2 border border-gray-300 rounded-md outline-none focus:ring-2 focus:ring-brand-blue text-right font-bold text-brand-blue bg-blue-50" />
-              </div>
+            <div className="space-y-1 lg:col-span-2">
+              <label className="text-sm font-medium text-gray-700">City, State, ZIP</label>
+              <input type="text" name="cityStateZip" value={formData.cityStateZip} onChange={handleTopLevelChange} placeholder="Bernardsville, NJ 07924" className="w-full p-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-brand-blue outline-none" />
             </div>
           </div>
         </section>
-      ))}
 
-      <button
-        onClick={addJobArea}
-        className="w-full py-4 border-2 border-dashed border-gray-300 text-gray-600 font-bold rounded-xl hover:border-brand-blue hover:text-brand-blue hover:bg-blue-50 transition-all"
-      >
-        + Add Another Job Area
-      </button>
+        {formData.jobAreas.map((area, index) => (
+          <section key={area.id} className="bg-white p-6 rounded-xl shadow-sm border border-gray-200 relative">
+            <div className="flex justify-between items-center mb-4 pb-2 border-b border-gray-100">
+              <h2 className="text-lg font-bold text-brand-brown">
+                Job Area {index + 1}
+              </h2>
+              {formData.jobAreas.length > 1 && (
+                <button onClick={() => removeJobArea(area.id)} className="text-red-500 hover:text-red-700 text-sm font-semibold transition-colors">
+                  ✕ Remove Area
+                </button>
+              )}
+            </div>
 
-      {/* --- NEW GLOBAL SETTINGS SECTION --- */}
-      <section className="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
-        <h2 className="text-lg font-bold text-brand-brown mb-4 border-b border-gray-100 pb-2">Global Settings & Materials</h2>
-        <div className="space-y-1">
-          <label className="text-sm font-medium text-gray-700">Global Material Exceptions (Appears in Footer)</label>
-          <input
-            type="text"
-            name="materialExceptions"
-            value={formData.materialExceptions || ""}
-            onChange={handleTopLevelChange}
-            placeholder="e.g. Paint, Deck Stain, specialized hardware"
-            className="w-full p-2 border border-gray-300 rounded-md outline-none focus:ring-2 focus:ring-brand-blue"
-          />
-          <p className="text-xs text-gray-500 mt-1">If left blank, the contract will state that ALL materials are included.</p>
-        </div>
-      </section>
+            <div className="space-y-4">
+              <div className="bg-blue-50 p-3 rounded-md border border-blue-100">
+                <label className="text-sm font-semibold text-brand-blue block mb-1">⚡ Quick-Fill Template</label>
+                <select
+                  onChange={(e) => applyTemplate(area.id, e.target.value)}
+                  className="w-full p-2 border border-blue-200 rounded-md outline-none focus:ring-2 focus:ring-brand-blue text-sm bg-white"
+                  defaultValue=""
+                >
+                  <option value="" disabled>-- Select a template to auto-fill --</option>
+                  {Object.keys(JOB_TEMPLATES).map((key) => (
+                    <option key={key} value={key}>{key}</option>
+                  ))}
+                </select>
+              </div>
 
-      <div className="bg-brand-brown text-white p-6 rounded-xl shadow-lg flex flex-col gap-4">
-        <div className="flex justify-between items-center border-b border-white border-opacity-20 pb-4">
-          <label className="flex items-center gap-2 text-sm text-gray-200 cursor-pointer hover:text-white transition-colors">
+              <div className="space-y-1">
+                <label className="text-sm font-medium text-gray-700">Area Name</label>
+                <input type="text" value={area.areaName} onChange={(e) => handleJobAreaChange(area.id, 'areaName', e.target.value)} placeholder="e.g. Master Bedroom" className="w-full p-2 border border-gray-300 rounded-md outline-none focus:ring-2 focus:ring-brand-blue font-semibold" />
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-sm font-medium text-gray-700">Tasks (One per line)</label>
+                <textarea rows={4} value={area.tasks} onChange={(e) => handleJobAreaChange(area.id, 'tasks', e.target.value)} placeholder="- Prep walls&#10;- Apply 2 coats of paint" className="w-full p-2 border border-gray-300 rounded-md outline-none focus:ring-2 focus:ring-brand-blue resize-y" />
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-1">
+                  <label className="text-sm font-medium text-gray-700">Exceptions</label>
+                  <input type="text" value={area.exceptions} onChange={(e) => handleJobAreaChange(area.id, 'exceptions', e.target.value)} placeholder="e.g. Baseboards not included" className="w-full p-2 border border-gray-300 rounded-md outline-none focus:ring-2 focus:ring-brand-blue" />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-sm font-medium text-gray-700">Price for this Area ($)</label>
+                  <input type="number" value={area.price} onChange={(e) => handleJobAreaChange(area.id, 'price', e.target.value)} placeholder="0.00" className="w-full p-2 border border-gray-300 rounded-md outline-none focus:ring-2 focus:ring-brand-blue text-right font-bold text-brand-blue bg-blue-50" />
+                </div>
+              </div>
+            </div>
+          </section>
+        ))}
+
+        <button
+          onClick={addJobArea}
+          className="w-full py-4 border-2 border-dashed border-gray-300 text-gray-600 font-bold rounded-xl hover:border-brand-blue hover:text-brand-blue hover:bg-blue-50 transition-all"
+        >
+          + Add Another Job Area
+        </button>
+
+        {/* --- NEW GLOBAL SETTINGS SECTION --- */}
+        <section className="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
+          <h2 className="text-lg font-bold text-brand-brown mb-4 border-b border-gray-100 pb-2">Global Settings & Materials</h2>
+          <div className="space-y-1">
+            <label className="text-sm font-medium text-gray-700">Global Material Exceptions (Appears in Footer)</label>
             <input
-              type="checkbox"
-              checked={formData.showLineItemPrices}
-              onChange={(e) => setFormData(prev => ({ ...prev, showLineItemPrices: e.target.checked }))}
-              className="w-4 h-4 rounded text-brand-blue accent-brand-blue cursor-pointer"
+              type="text"
+              name="materialExceptions"
+              value={formData.materialExceptions || ""}
+              onChange={handleTopLevelChange}
+              placeholder="e.g. Paint, Deck Stain, specialized hardware"
+              className="w-full p-2 border border-gray-300 rounded-md outline-none focus:ring-2 focus:ring-brand-blue"
             />
-            Show individual area prices on PDF
-          </label>
-        </div>
+            <p className="text-xs text-gray-500 mt-1">If left blank, the contract will state that ALL materials are included.</p>
+          </div>
+        </section>
 
-        <div className="flex flex-col lg:flex-row justify-between items-center gap-4">
-          <div className="text-xl">
-            <span className="text-gray-300 mr-2">Grand Total:</span>
-            <span className="font-bold text-brand-green bg-white px-3 py-1 rounded-md shadow-sm">${grandTotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+        <div className="bg-brand-brown text-white p-6 rounded-xl shadow-lg flex flex-col gap-4">
+          <div className="flex justify-between items-center border-b border-white border-opacity-20 pb-4">
+            <label className="flex items-center gap-2 text-sm text-gray-200 cursor-pointer hover:text-white transition-colors">
+              <input
+                type="checkbox"
+                checked={formData.showLineItemPrices}
+                onChange={(e) => setFormData(prev => ({ ...prev, showLineItemPrices: e.target.checked }))}
+                className="w-4 h-4 rounded text-brand-blue accent-brand-blue cursor-pointer"
+              />
+              Show individual area prices on PDF
+            </label>
           </div>
 
-          <div className="flex flex-wrap gap-3 w-full lg:w-auto justify-end">
-            <button onClick={handleSaveToCloud} disabled={isSaving} className={`px-4 py-2 rounded-md font-bold transition-colors shadow-sm ${isSaving ? 'bg-gray-500' : 'bg-brand-amber hover:bg-opacity-90 text-white'}`}>
-              {isSaving ? (estimateId ? "Updating..." : "Saving...") : (estimateId ? "Update" : "Save")}
-            </button>
-            <button
-              onClick={() => PDFService.generateEstimatePDF(formData)}
-              className="px-4 py-2 bg-gray-600 hover:bg-opacity-90 text-white rounded-md font-bold transition-colors shadow-sm"
-            >
-              View PDF
-            </button>
-            <button
-              onClick={handleSendEmail}
-              disabled={isSending}
-              className={`px-4 py-2 rounded-md font-bold transition-colors shadow-sm ${isSending ? 'bg-gray-400 text-white' : 'bg-brand-blue hover:bg-opacity-90 text-white'}`}
-            >
-              {isSending ? "Sending..." : "📧 Send to Client"}
-            </button>
+          <div className="flex flex-col lg:flex-row justify-between items-center gap-4">
+            <div className="text-xl">
+              <span className="text-gray-300 mr-2">Grand Total:</span>
+              <span className="font-bold text-brand-green bg-white px-3 py-1 rounded-md shadow-sm">${grandTotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+            </div>
+
+            <div className="flex flex-wrap gap-3 w-full lg:w-auto justify-end">
+              <button onClick={handleSaveToCloud} disabled={isSaving} className={`px-4 py-2 rounded-md font-bold transition-colors shadow-sm ${isSaving ? 'bg-gray-500' : 'bg-brand-amber hover:bg-opacity-90 text-white'}`}>
+                {isSaving ? (estimateId ? "Updating..." : "Saving...") : (estimateId ? "Update" : "Save")}
+              </button>
+              <button
+                onClick={() => PDFService.generateEstimatePDF(formData)}
+                className="px-4 py-2 bg-gray-600 hover:bg-opacity-90 text-white rounded-md font-bold transition-colors shadow-sm"
+              >
+                View PDF
+              </button>
+              <button
+                onClick={handleSendEmail}
+                disabled={isSending}
+                className={`px-4 py-2 rounded-md font-bold transition-colors shadow-sm ${isSending ? 'bg-gray-400 text-white' : 'bg-brand-blue hover:bg-opacity-90 text-white'}`}
+              >
+                {isSending ? "Sending..." : "📧 Send to Client"}
+              </button>
+            </div>
           </div>
         </div>
+
+        {statusMessage && (
+          <div className={`p-4 rounded-md text-sm font-medium ${statusMessage.type === 'error' ? 'bg-red-50 text-red-700' : statusMessage.type === 'success' ? 'bg-green-50 text-brand-green' : 'bg-blue-50 text-brand-blue'}`}>
+            {statusMessage.text}
+          </div>
+        )}
       </div>
-
-      {statusMessage && (
-        <div className={`p-4 rounded-md text-sm font-medium ${statusMessage.type === 'error' ? 'bg-red-50 text-red-700' : statusMessage.type === 'success' ? 'bg-green-50 text-brand-green' : 'bg-blue-50 text-brand-blue'}`}>
-          {statusMessage.text}
-        </div>
-      )}
-    </div>
+    </>
   );
 }

@@ -57,7 +57,7 @@ export default function LandingPage() {
   };
 
   return (
-    <div className="font-sans text-gray-800 bg-[url('/logo.png')] bg-repeat">
+    <div className="font-sans text-gray-800 bg-[url('/logobg.png')] bg-repeat">
 
       {/* HEADER */}
       <header className="w-full h-[700px] bg-brand-brown bg-[url('/img/header-bg-1.png')] bg-cover bg-fixed bg-center relative">
@@ -146,7 +146,15 @@ export default function LandingPage() {
               <button
                 key={btn.id}
                 onClick={() => setActiveFilter(btn.id)}
-                className={`px-5 py-2 rounded-full font-semibold border-2 transition-all ${activeFilter === btn.id ? 'bg-trusty-blue text-white border-trusty-blue' : 'border-trusty-blue text-trusty-blue hover:bg-trusty-blue hover:text-white'}`}
+                className={`
+                  px-5 py-2 rounded-full font-semibold border-2 transition-all
+                  border-brand-blue
+
+                  ${activeFilter === btn.id
+                    ? 'bg-brand-blue text-brand-canvas shadow-md'
+                    : 'bg-brand-canvas text-brand-blue hover:bg-brand-amber hover:text-brand-brown'
+                  }
+                `}
               >
                 {btn.label}
               </button>

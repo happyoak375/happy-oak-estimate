@@ -37,7 +37,7 @@ export default function LoginPage() {
           alt="Happy Oak Logo"
           width={150}
           height={150}
-          className="object-contain drop-shadow-md mb-4"
+          className="w-auto h-auto object-contain drop-shadow-md mb-4"
           priority
         />
         <h2 className="text-center text-3xl font-extrabold text-brand-brown">
